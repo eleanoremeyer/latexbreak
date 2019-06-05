@@ -18,6 +18,12 @@ Lines starting with `#` are comments.
 - `protect_break_after [regex]`: If a line matches this regex, then the linebreak at the end of this line will be preserved.
 - `protect_break_before [regex]`: If a line matches this regex, then the linebreak before this line will be preserved.
 
+## build
+
+```
+mvn package
+```
+
 ## usage
 
 ```
