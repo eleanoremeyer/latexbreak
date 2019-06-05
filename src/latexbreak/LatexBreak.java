@@ -144,8 +144,8 @@ public class LatexBreak {
     public String process() {
         detectVerbatim();
         trim();
-        removeDuplicateBlankLines();
         if (removeNewlines) {
+            removeDuplicateBlankLines();
             removeLinebreaks();
         }
         addLinebreaks();
