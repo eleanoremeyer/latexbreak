@@ -34,7 +34,7 @@ public class LatexBreak {
     /**
      * matches consecutive argument lists with squared or curly brackets
      */
-    private static String args = "(?<args>((" + curly + ")|(" + squared + "))*)";
+    private static String args = "(?<args>\\s|((" + curly + ")|(" + squared + "))+)";
 
     private static String slash = "\\\\";
     /**
@@ -91,14 +91,15 @@ public class LatexBreak {
         try (var in = new BufferedReader(new FileReader(System.getProperty("user.dir") + File.separator + "latexbreak.config"))) {
             while (in.ready()) {
                 var line = in.readLine();
+                if (line.startsWith("#")) {
+                    continue;
+                }
                 var value = line.split(":")[1].trim();
                 var values = value.split(",");
                 for (var i = 0; i < values.length; i++) {
                     values[i] = values[i].trim();
                 }
-                if (line.startsWith("#")) {
-                    continue;
-                } else if (line.startsWith("break_around_macro:")) {
+                if (line.startsWith("break_around_macro:")) {
                     for (var val: values) {
                         breakAroundMacro(val);
                     }
