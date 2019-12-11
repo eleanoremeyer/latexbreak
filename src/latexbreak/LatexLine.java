@@ -11,6 +11,7 @@ public class LatexLine {
     public String content;
     public boolean protectSentences;
     public boolean protect;
+    public boolean lineComment;
 
     public LatexLine strip() {
         assert !protect;

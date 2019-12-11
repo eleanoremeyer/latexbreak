@@ -34,13 +34,20 @@ public class LatexBreak {
     /**
      * matches consecutive argument lists with squared or curly brackets
      */
-    private static String args = "(?<args>\\s|((" + curly + ")|(" + squared + "))+)";
+    private static String args = "(?<args>((" + curly + ")|(" + squared + "))*)";
 
     private static String slash = "\\\\";
     /**
      * matches everything but slashes -- used, for example, to avoid matching the "\[" in "\\[4cm]"
      */
     private static String noSlash = "(?<noslash>[^" + slash + "]|^)";
+
+    private static String partialComment = ".*(^|[^\\\\])%.*";
+
+    // Prefix: ([^%]*(\\\\%)?)* -> arbitrary characters except for %, but \% is allowed
+    //         ($|[^%\\\\])     -> line-end or neither % nor a slash
+    // Suffix: % followed by an arbitrary string or the empty word
+    private static Pattern commentSplit = Pattern.compile("(?<non_comment_prefix>([^%]*(\\\\%)?)*($|[^%\\\\]))(?<comment_suffix>(%.*)?)");
 
     private String beginProtected;
 
@@ -65,15 +72,15 @@ public class LatexBreak {
     private String protectBreakBefore;
 
     public void breakAroundMacro(String command) {
-        replacements.put(Pattern.compile(noSlash + slash + command + args), "${noslash}" + newline + slash + command + "${args}" + newline);
+        replacements.put(Pattern.compile(noSlash + slash + "(?<cmd>" + command + ")" + args), "${noslash}" + newline + slash + "${cmd}" + "${args}" + newline);
     }
 
     public void breakAfterMacro(String command) {
-        replacements.put(Pattern.compile(noSlash + slash + command + args), "${noslash}" + slash + command + "${args}" + newline);
+        replacements.put(Pattern.compile(noSlash + slash + "(?<cmd>" + command + ")" + args), "${noslash}" + slash + "${cmd}" + "${args}" + newline);
     }
 
     public void breakBeforeMacro(String command) {
-        replacements.put(Pattern.compile(noSlash + slash + command + args), "${noslash}" + newline + slash + command + "${args}");
+        replacements.put(Pattern.compile(noSlash + slash + "(?<cmd>" + command + ")" + args), "${noslash}" + newline + slash + "${cmd}" + "${args}");
     }
 
     public static void main(String[] args) throws IOException {
@@ -145,6 +152,7 @@ public class LatexBreak {
     public String process() {
         detectVerbatim();
         trim();
+        detectComments();
         if (removeNewlines) {
             removeDuplicateBlankLines();
             removeLinebreaks();
@@ -265,6 +273,14 @@ public class LatexBreak {
         }
     }
 
+    private void detectComments() {
+        for (var line: lines) {
+            if (line.startsWith("%")) {
+                line.lineComment = true;
+            }
+        }
+    }
+
     private void trim() {
         for (var line: lines) {
             if (!line.protect) {
@@ -281,8 +297,8 @@ public class LatexBreak {
                     && !lines.get(i + 1).matches(protectBreakBefore)
                     && !lines.get(i).protect                     // do not touch verbatim lines
                     && !lines.get(i + 1).protect
-                    && !lines.get(i).matches(".*(^|[^\\\\])%.*") // do nothing if the first line contain comments (but don't be fooled by \%)
-                    && !lines.get(i + 1).startsWith("%")) {      // do not touch line comments
+                    && !lines.get(i).matches(partialComment)     // do nothing if the first line contain comments
+                    && !lines.get(i + 1).lineComment) {          // do not touch line comments
                 lines.get(i).append(" ").concat(lines.get(i + 1)).strip();;
                 lines.remove(i + 1);
             } else {
@@ -310,13 +326,19 @@ public class LatexBreak {
         var res = new ArrayList<LatexLine>();
         // keep old blank lines...
         for (var line: lines) {
-            if (line.isBlank() || line.protect) {
+            if (line.isBlank() || line.protect || line.lineComment) {
                 res.add(line);
             } else {
-                for (var e: replacements.entrySet()) {
-                    var matcher = e.getKey().matcher(line.content);
-                    line.content = matcher.replaceAll(e.getValue()).strip();
+                var split = commentSplit.matcher(line.content);
+                if (!split.matches()) {
+                    throw new RuntimeException(commentSplit + " does not match " + line.content + ", but it's supposed to match any string.");
                 }
+                var prefix = split.group("non_comment_prefix");
+                for (var e: replacements.entrySet()) {
+                    var matcher = e.getKey().matcher(prefix);
+                    prefix = matcher.replaceAll(e.getValue());
+                }
+                line.content = prefix + split.group("comment_suffix");
                 for (var s: line.split(newline)) {
                     // ... but don't introduce new blank lines
                     if (!s.isBlank()) {
