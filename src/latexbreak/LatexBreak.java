@@ -152,7 +152,7 @@ public class LatexBreak {
     public String process() {
         detectVerbatim();
         trim();
-        detectComments();
+        detectLineComments();
         if (removeNewlines) {
             removeDuplicateBlankLines();
             removeLinebreaks();
@@ -188,7 +188,7 @@ public class LatexBreak {
     private void splitSentences() {
         var res = new ArrayList<LatexLine>();
         for (var line: lines) {
-            if (line.protectSentences || line.protect || line.isBlank()) {
+            if (line.protectSentences || line.protect || line.isBlank() || line.lineComment) {
                 res.add(line);
             } else {
                 boolean math = false;
@@ -273,7 +273,7 @@ public class LatexBreak {
         }
     }
 
-    private void detectComments() {
+    private void detectLineComments() {
         for (var line: lines) {
             if (line.startsWith("%")) {
                 line.lineComment = true;
