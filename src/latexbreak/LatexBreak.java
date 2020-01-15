@@ -21,6 +21,14 @@ public class LatexBreak {
      * replacement map that specifies where to insert line breaks
      */
     private Map<Pattern, String> replacements = new LinkedHashMap<>();
+    /**
+     * Associates values 'v' from the map 'replacements' with another pattern 'guard'
+     * such that if 'v' and 'guard' match at the same position, then no linebreak is
+     * inserted after the match of 'v'.
+     *
+     * Used, e.g., to avoid inserting a linebreak after \part in \partial.
+     */
+    private Map<Pattern, Pattern> guards = new LinkedHashMap<>();
 
     public static String newline = System.lineSeparator();
     /**
@@ -35,6 +43,11 @@ public class LatexBreak {
      * matches consecutive argument lists with squared or curly brackets
      */
     private static String args = "(?<args>((" + curly + ")|(" + squared + "))*)";
+    /**
+     * a latex-command continues unless it is followed by a slash, whitespace, or arguments
+     * e.g., \partial continues after \part (which would be a valid command by itself)
+     */
+    private static String commandContinues = "[^\\\\\\s\\[\\{]";
 
     private static String slash = "\\\\";
     /**
@@ -71,16 +84,33 @@ public class LatexBreak {
 
     private String protectBreakBefore;
 
+    boolean isCommandEnd(char c) {
+        return c == '[' || c == '{' || c == '\\';
+    }
+
+    private void addMacroReplacement(String command, Pattern pattern, String replacement) {
+        replacements.put(pattern, replacement);
+        if (!isCommandEnd(command.charAt(command.length() - 1))) {
+            guards.put(pattern, Pattern.compile(noSlash + slash + command + commandContinues));
+        }
+    }
+
     public void breakAroundMacro(String command) {
-        replacements.put(Pattern.compile(noSlash + slash + "(?<cmd>" + command + ")" + args), "${noslash}" + newline + slash + "${cmd}" + "${args}" + newline);
+        var pattern = Pattern.compile(noSlash + slash + "(?<cmd>" + command + ")" + args);
+        var replacement = "${noslash}" + newline + slash + "${cmd}" + "${args}" + newline;
+        addMacroReplacement(command, pattern, replacement);
     }
 
     public void breakAfterMacro(String command) {
-        replacements.put(Pattern.compile(noSlash + slash + "(?<cmd>" + command + ")" + args), "${noslash}" + slash + "${cmd}" + "${args}" + newline);
+        var pattern = Pattern.compile(noSlash + slash + "(?<cmd>" + command + ")" + args);
+        var replacement = "${noslash}" + slash + "${cmd}" + "${args}" + newline;
+        addMacroReplacement(command, pattern, replacement);
     }
 
     public void breakBeforeMacro(String command) {
-        replacements.put(Pattern.compile(noSlash + slash + "(?<cmd>" + command + ")" + args), "${noslash}" + newline + slash + "${cmd}" + "${args}");
+        var pattern = Pattern.compile(noSlash + slash + "(?<cmd>" + command + ")" + args);
+        var replacement = "${noslash}" + newline + slash + "${cmd}" + "${args}";
+        addMacroReplacement(command, pattern, replacement);
     }
 
     public static void main(String[] args) throws IOException {
@@ -334,9 +364,18 @@ public class LatexBreak {
                     throw new RuntimeException(commentSplit + " does not match " + line.content + ", but it's supposed to match any string.");
                 }
                 var prefix = split.group("non_comment_prefix");
+                var origPrefix = prefix;
                 for (var e: replacements.entrySet()) {
-                    var matcher = e.getKey().matcher(prefix);
-                    prefix = matcher.replaceAll(e.getValue());
+                    var pattern = e.getKey();
+                    var replacement = e.getValue();
+                    var guard = Optional.ofNullable(guards.get(pattern));
+                    var matcher = pattern.matcher(prefix);
+                    while (matcher.find()) {
+                        var guardMatcher = guard.map(x -> x.matcher(origPrefix.substring(matcher.start())));
+                        if (guardMatcher.isEmpty() || !guardMatcher.get().find() || guardMatcher.get().start() > 0) {
+                            prefix = matcher.replaceAll(replacement);
+                        }
+                    }
                 }
                 line.content = prefix + split.group("comment_suffix");
                 for (var s: line.split(newline)) {
