@@ -194,12 +194,8 @@ public class LatexBreak {
         }
         trim();
         removeDuplicateBlanks();
-        StringBuilder res = new StringBuilder();
-        for (var line: lines) {
-            res.append(line);
-            res.append(newline);
-        }
-        return res.toString();
+
+        return lines.stream().map(LatexLine::toString).collect(Collectors.joining(newline));
     }
 
     private void removeDuplicateBlanks() {
