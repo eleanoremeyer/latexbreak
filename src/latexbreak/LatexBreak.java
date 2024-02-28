@@ -181,6 +181,7 @@ public class LatexBreak {
 
     public String process() {
         detectVerbatim();
+        detectMath();
         trim();
         detectLineComments();
         if (removeNewlines) {
@@ -189,7 +190,6 @@ public class LatexBreak {
             removeLinebreaks();
         }
         addLinebreaks();
-        detectMath();
         if (breakAfterSentences) {
             splitSentences();
         }
@@ -321,8 +321,8 @@ public class LatexBreak {
                     && !lines.get(i+1).isBlank()
                     && !lines.get(i).matches(protectBreakAfter)
                     && !lines.get(i + 1).matches(protectBreakBefore)
-                    && !lines.get(i).protect                     // do not touch verbatim lines
-                    && !lines.get(i + 1).protect
+                    && !lines.get(i).protect && !lines.get(i).protectSentences  // do not touch verbatim lines
+                    && !lines.get(i + 1).protect && !lines.get(i+1).protectSentences
                     && !lines.get(i).matches(partialComment)     // do nothing if the first line contain comments
                     && !lines.get(i + 1).lineComment) {          // do not touch line comments
                 lines.get(i).append(" ").concat(lines.get(i + 1)).strip();;
@@ -358,7 +358,7 @@ public class LatexBreak {
         var res = new ArrayList<LatexLine>();
         // keep old blank lines...
         for (var line: lines) {
-            if (line.isBlank() || line.protect || line.lineComment) {
+            if (line.isBlank() || line.protect || line.protectSentences || line.lineComment) {
                 res.add(line);
             } else {
                 var split = commentSplit.matcher(line.content);
