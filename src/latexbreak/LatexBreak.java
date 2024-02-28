@@ -185,6 +185,7 @@ public class LatexBreak {
         detectLineComments();
         if (removeNewlines) {
             removeDuplicateBlankLines();
+            removeTrailingBlankLine();
             removeLinebreaks();
         }
         addLinebreaks();
@@ -345,6 +346,12 @@ public class LatexBreak {
                 }
             }
         }
+    }
+
+    private void removeTrailingBlankLine() {
+    	if (lines.get(lines.size() - 1).isBlank()) {
+    		lines.remove(lines.size() - 1);
+    	}
     }
 
     private void addLinebreaks() {
