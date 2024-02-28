@@ -237,7 +237,6 @@ public class LatexBreak {
                             i += characters - 1;
                         } else if (line.length() > i+1 && lineEnds.contains(line.charAt(i)) && line.charAt(i+1) == ' ') {
                             res.add(line.clone().substring(lastSentenceEnd + 1, i + 1).strip());
-                            res.add(line.clone().setContent("%"));
                             lastSentenceEnd = i;
                         }
                     }
